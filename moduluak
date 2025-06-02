@@ -1,0 +1,104 @@
+#FASTQC
+#!/bin/bash
+
+# Argumentuak: Sarrerako bi fitxategiak eta irteerako fitxategien kokapena
+read1=$1
+read2=$2
+outdir=$3
+
+# Karpeta bat sortu irteerako fitxategientzat eta FastQC exekutatu 
+mkdir -p $outdir/fastqc
+micromamba run -n QC fastqc -o $outdir/fastqc $read1 $read2
+
+
+#SHOVILL
+#!/bin/bash
+
+# Argumentuak: Sarrerako bi fitxategiak eta irteerako fitxategien kokapena
+read1=$1
+read2=$2
+outdir=$3
+
+# Karpeta bat sortu irteerako fitxategientzat eta shovill exekutatu
+mkdir -p $outdir/shovill
+micromamba run -n Assembly shovill --R1 $read1 --R2 $read2 --outdir $outdir/shovill --trim --force
+
+
+#QUAST
+#!/bin/bash
+
+# Argumentuak: Zuzendutako genoma, irteerako fitxategien kokapena
+corrected=$1
+outdir=$2
+
+# Karpeta sortu irteerako fitxategientzat eta QUAST exekutatu
+mkdir -p "$outdir/quast"
+micromamba run -n quast quast.py --threads 4 --output-dir "$outdir/quast" "$corrected"
+
+
+#PILON
+#!/bin/bash
+
+# Argumentuak: Zuzendu nahi den genoma, zuzeneketarako erabiliko diren lerrokatutako irakurketak eta irteerako fitxategien kokapena
+contigs=$1
+bam=$2
+outdir=$3
+
+# Karpeta bat sortu irteerako fitxategientzat, baimena eman  lerrokatutako irakurketak erabiltzeko eta pilon exekutatu
+mkdir -p "$outdir/pilon"
+chmod 644 "$bam"
+micromamba run -n pilon pilon --genome $contigs --frags $bam  --output pilon_corrected --outdir $outdir/pilon 
+
+
+#KRAKEN2
+#!/bin/bash
+
+# Argumentuak: Zuzendutako genoma, datubaseen kokapena eta irteerako fitxategien kokapena
+corrected=$1
+db_dir=$2
+outdir=$3
+
+# Karpeta sortu irteerako fitxategientzat eta kraken exekutatu
+mkdir -p "$outdir/kraken2"
+micromamba run -n kraken2 kraken2 --rc-file "$corrected" --db "$db_dir" --output "$outdir/kraken2/kraken_results.txt" --report "$outdir/kraken2/kraken_report.txt" --classified-out "$outdir/kraken2/classified.fa" --unclassified-out "$outdir/kraken2/clean_contigs.fa" 
+
+
+#PROKKA
+#!/bin/bash
+
+# Argumentuak: Zuzendutako genoma eta irteerako fitxategien kokapena
+corrected=$1
+outdir=$2
+
+# Karpeta sortu irteerako fitxategientzat eta prokka exekutatu
+mkdir -p $outdir/prokka
+micromamba run -n prokka prokka --outdir $outdir/prokka --prefix $(basename $corrected .fa) $corrected --force 
+
+
+#ABRICATE
+#!/bin/bash
+
+# Argumentuak: Zuzendutako genoma eta irteerako fitxategien kokapena
+corrected=$1
+outdir=$2
+
+# Karpeta sortu irteerako fitxategientzat eta abricate exekutatu
+mkdir -p $outdir/$sample/abricate
+micromamba run -n abricate abricate  --db vfdb --minid 20 --mincov 0 $corrected > $outdir/$sample/abricate/abricate.tsv 2>&1 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
