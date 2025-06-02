@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Debug modua aktibatu exekutatutako komandoak ikusi
+set -x
+
+# Argumentuak: Sarrerako eta irteerako fitxatergien kokapena eta Kraken2-k erabiliko duen datu-basearen kokapena
+read_dir=$1
+outdir=$2
+db_dir=$3
+
+# R1 fitxategiak bilatu
+read1_files=$(find $read_dir -maxdepth 1 -type f -name "*_R1_*.*f*q*" | sort)
+
+# Aurkitutako R1 fitxategi bakoitzeko iteratu
+for read1 in $read1_files; do
+
+    # R1 fitxategiari dagokion R2 fitxategia bilatu
+    read2=${read1/_R1_/_R2_}
+
+    # Laginaren izena jaso (_R1... kenduta)
+    sample=$(basename "$read1" | sed 's/_R1_.*//')
+
+    echo "$sample lagina prozesatzen"
+
+    # Laginarentzako irteera-karpeta sortu
+    mkdir -p "$outdir/$sample"
+
+    # 1. Kalitate kontrola FastQC bidez
+    bash shiga/modules/fastqc.sh $read1 $read2 $outdir/$sample
+
+    # 2. Genomaren muntaia Shovill bidez
+    bash shiga/modules/shovill.sh $read1 $read2 $outdir/$sample
+
+    # Irteerako fitxategiak erabiltzeko baimena eman
+    chmod -R +x $outdir/$sample/shovill/
+
+    # Argumentu berria sortu: Shovill-ek egin duen muntaia, contigs-a
+    contigs=$outdir/$sample/shovill/contigs.fa
+
+    if [[ ! -f "$contigs" ]]; then
+        echo "ERROREA: Ez da muntaia ondo egin $sample -rentzat"
+        continue
+    fi
+
+    # 3. Genomaren muntaiaren zuzenketa Pilon bidez
+
+    # BWArentzat contig-ak indexatu
+    bwa index $contigs
+
+    # Irakurketak muntaiarekin lerrokatu
+    bwa mem $contigs $read1 $read2 > $outdir/$sample/pilon/${sample}.sam
+
+    # SAMak BAM bihurtu
+    samtools view -Sb $outdir/$sample/pilon/${sample}.sam > $outdir/$sample/pilon/${sample}.bam
+
+    # BAMak ordenatu
+    samtools sort $outdir/$sample/pilon/${sample}.bam -o $outdir/$sample/pilon/${sample}.sorted.bam
+
+    # BAMak indexatu
+    samtools index $outdir/$sample/pilon/${sample}.sorted.bam
+
+    # Irteerako fitxategiak erabiltzeko baimena eman 
+    chmod -R u+rw $outdir/$sample/pilon/
+
+    # Pilon exekutatu muntaia zuzentzeko
+    bash shiga/modules/pilon.sh $contigs $outdir/$sample/pilon/${sample}.sorted.bam $outdir/$sample
+
+    # Argumentu berria sortu: Pilon-ek zuzendutako muntaia
+    corrected=$outdir/$sample/pilon/pilon_corrected.fasta
+
+    if [[ ! -f "$corrected" ]]; then
+        echo "ERROREA: Pilon-ek ez du zuzendutako fitxategia sortu $sample-rentzat"
+        continue
+    fi
+
+    # 4. Muntaiaren zuzenketaren ebaluazioa QUAST bidez
+    bash shiga/modules/quast.sh $corrected $outdir/$sample
+
+    # 5. Sailkapen taxonomikoa Kraken2 bidez
+    bash shiga/modules/kraken2.sh $corrected $db_dir $outdir/$sample
+
+    # 6. Birulentzia geneen identifikazioa Abricate bidez
+    bash shiga/modules/abricate.sh $corrected $db_dir $outdir/$sample
+
+    # 7. Genomaren anotazioa Prokka bidez
+    bash shiga/modules/prokka.sh $corrected $outdir/$sample
+
+done
+
