@@ -1,0 +1,87 @@
+# Paketeen instalazioa(c("readxl", "dplyr", "tidyr", "factoextra", "ape"))
+
+library(dplyr)
+library(tidyr)
+library(factoextra)
+library(ape)
+library(stringr)
+
+# 1. PROKKAKO FITXATEGIEKIN: Excel fitxategien karpeta definitu
+directory <- "SHIGAPROKKA/"  # <-- change this
+files <- list.files(path = directory, pattern = "\\.tabular$", full.names = TRUE)
+
+# 2. Fitxategi bakoitzeko 6. zutabea irakurri eta anduiaren izenarekin erlazionatu
+genes_list_p <- lapply(files, function(file) {
+  data <- read.delim(file, header = TRUE, sep = "\t")  # Read as TSV
+  genes <- data[[6]]  # Column 6
+  genes <- genes[!is.na(genes)]
+  unique(genes)
+})
+
+# Fitxategiaren izenetik anduien izenak  lortu
+strain_names_p <- tools::file_path_sans_ext(basename(files))
+
+# Presentzia/ausentzia matrizea sortu
+all_genes_p <- sort(unique(unlist(genes_list_p)))
+
+matrix_p <- sapply(genes_list_p, function(genes) {
+  as.integer(all_genes_p %in% genes)
+})
+colnames(matrix_p) <- strain_names_p
+rownames(matrix_p) <- all_genes_p
+
+matrix_transposed <- t(matrix_p)
+
+# Matrizea gorde
+write.table(matrix_transposed, "matrix_transposed.csv", sep = "\t", quote = FALSE)
+
+# Distantzia matrizea kalkulatu (Jaccard distantzia erabiliz)
+distance <- dist(matrix_transposed, method = "binary")
+
+# Neighbot Joining algoritmoa erabiliz zuhaitz filogenetikoa sortu
+tree <- nj(distance)
+
+tree$tip.label <- gsub("prokka output", "", tree$tip.label)
+
+tip_data <- data.frame(label = tree$tip.label)
+
+tip_colors <- ifelse(grepl("O", tip_data$label), "black", "blue")
+
+plot(tree, tip.color = tip_colors, cex = 0.6, no.margin=TRUE, direction="downwards")
+
+
+
+# 1. ABRICATEKO FITXATEGIEKIN: Excel fitxategien karpeta definitu
+directory <- "Abricate/"  # <-- change this
+files <- list.files(path = directory, pattern = "\\.tabular$", full.names = TRUE)
+
+list.files(path = directory)
+
+# 2. Fitxategi bakoitzeko 6. zutabea irakurri eta anduiaren izenarekin erlazionatu
+genes_list_a <- lapply(files, function(file) {
+  data <- read.delim(file, header = TRUE, sep = "\t")  # Read as TSV
+  genes <- data[[6]]  # Column 6
+  genes <- genes[!is.na(genes)]
+  unique(genes)
+})
+
+# Fitxategiaren izenetik anduien izenak  lortu
+strain_names_a <- tools::file_path_sans_ext(basename(files))
+
+# 3. Presentzia/ausentzia matrizea sortu
+all_genes_a <- sort(unique(unlist(genes_list_a)))
+
+matrix_a <- sapply(genes_list_a, function(genes) {
+  as.integer(all_genes_a %in% genes)
+})
+colnames(matrix_a) <- strain_names_a
+rownames(matrix_a) <- all_genes_a
+
+# Gorde matrizea
+write.csv(matrix_a, "presence_absence_matrix_abricate.csv")
+
+matrix_b <- "summary.csv"
+
+# 4. PCA bidezko Biplot-a egin 
+pca_a <- prcomp(t(matrix_b), scale. = TRUE)
+fviz_pca_biplot(pca_a, repel = TRUE, label = "var", col.var = "blue", col.ind = "red")
