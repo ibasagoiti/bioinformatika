@@ -18,10 +18,10 @@ genes_list_p <- lapply(files, function(file) {
   unique(genes)
 })
 
-# Fitxategiaren izenetik anduien izenak  lortu
+# 3. Fitxategiaren izenetik anduien izenak  lortu
 strain_names_p <- tools::file_path_sans_ext(basename(files))
 
-# Presentzia/ausentzia matrizea sortu
+# 4. Presentzia/ausentzia matrizea sortu
 all_genes_p <- sort(unique(unlist(genes_list_p)))
 
 matrix_p <- sapply(genes_list_p, function(genes) {
@@ -32,23 +32,21 @@ rownames(matrix_p) <- all_genes_p
 
 matrix_transposed <- t(matrix_p)
 
-# Matrizea gorde
+# 5. Matrizea gorde
 write.table(matrix_transposed, "matrix_transposed.csv", sep = "\t", quote = FALSE)
 
-# Distantzia matrizea kalkulatu (Jaccard distantzia erabiliz)
+# 6. Distantzia matrizea kalkulatu (Jaccard distantzia erabiliz)
 distance <- dist(matrix_transposed, method = "binary")
 
-# Neighbot Joining algoritmoa erabiliz zuhaitz filogenetikoa sortu
+# 7. Neighbor Joining algoritmoa erabiliz zuhaitz filogenetikoa sortu
 tree <- nj(distance)
-
 tree$tip.label <- gsub("prokka output", "", tree$tip.label)
-
 tip_data <- data.frame(label = tree$tip.label)
-
 tip_colors <- ifelse(grepl("O", tip_data$label), "black", "blue")
+plot(tree, tip.color = tip_colors, cex = 1.5, no.margin=TRUE, direction="rightwards")
 
-plot(tree, tip.color = tip_colors, cex = 0.6, no.margin=TRUE, direction="downwards")
-
+# 8. Anduien arteko distantziak erakutsi
+edgelabels(round(tree$edge.length, 3), cex = 0.6, frame = "none", adj = c(0.5, -0.5))
 
 
 # 1. ABRICATEKO FITXATEGIEKIN: Excel fitxategien karpeta definitu
@@ -65,10 +63,10 @@ genes_list_a <- lapply(files, function(file) {
   unique(genes)
 })
 
-# Fitxategiaren izenetik anduien izenak  lortu
+# 3. Fitxategiaren izenetik anduien izenak  lortu
 strain_names_a <- tools::file_path_sans_ext(basename(files))
 
-# 3. Presentzia/ausentzia matrizea sortu
+# 4. Presentzia/ausentzia matrizea sortu
 all_genes_a <- sort(unique(unlist(genes_list_a)))
 
 matrix_a <- sapply(genes_list_a, function(genes) {
@@ -77,11 +75,11 @@ matrix_a <- sapply(genes_list_a, function(genes) {
 colnames(matrix_a) <- strain_names_a
 rownames(matrix_a) <- all_genes_a
 
-# Gorde matrizea
+# 5. Gorde matrizea
 write.csv(matrix_a, "presence_absence_matrix_abricate.csv")
 
 matrix_b <- "summary.csv"
 
-# 4. PCA bidezko Biplot-a egin 
+# 6. PCA bidezko Biplot-a egin 
 pca_a <- prcomp(t(matrix_b), scale. = TRUE)
 fviz_pca_biplot(pca_a, repel = TRUE, label = "var", col.var = "blue", col.ind = "red")
